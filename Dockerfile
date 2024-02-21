@@ -13,14 +13,15 @@ RUN make extract_all
 RUN make install -j$(nproc)
 
 ENV PATH="/opt/musl-cross/bin:${PATH}"
-RUN apk add --no-cache flex bc perl bison quilt rsync python3 nasm xz dosfstools mtools
+RUN apk add --no-cache flex bc perl bison quilt rsync python3 nasm xz dosfstools mtools ncurses-terminfo-base
 RUN apk del gcc g++
 
 VOLUME /repo-src
 VOLUME /repo-dist
 VOLUME /repo-stamp
-RUN mkdir -p /repo
-WORKDIR /repo
+
+RUN mkdir -p /src/floppy-linux
+WORKDIR /src/floppy-linux
 
 COPY --chmod=755 docker/init.sh /init.sh
 COPY --chmod=755 docker/build.sh /usr/local/bin/flbuild
