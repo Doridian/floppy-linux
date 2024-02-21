@@ -20,28 +20,37 @@ all: stamp/fetch-kernel \
 	-mkdir -p stamp
 	echo "Starting build ..."
 
-stamp/fetch-kernel:
+stamp/download-kernel:
 	-mkdir -p dist src stamp
 	cd dist && wget $(LINUX_KERNEL_URL)
+	touch stamp/download-kernel
+
+stamp/fetch-kernel: stamp/download-kernel
 	cd src && tar -xvf ../dist/$(LINUX_TARBALL)
 	touch stamp/fetch-kernel		
 
-stamp/fetch-busybox:
+stamp/download-busybox:
 	-mkdir -p dist src stamp
 	cd dist && wget $(BUSYBOX_URL)
+	touch stamp/download-busybox
+
+stamp/fetch-busybox: stamp/download-busybox
 	cd src && tar -xvf ../dist/$(BUSYBOX_TARBALL)
 	touch stamp/fetch-busybox		
 
-stamp/fetch-syslinux:
+stamp/download-syslinux:
 	-mkdir -p dist src stamp
 	cd dist && wget $(UBUNTU_SYSLINUX_ORIG) -O syslinux_orig.tar.xz
 	cd dist && wget $(UBUNTU_SYSLINUX_PKG) -O syslinux_pkg.tar.xz
+	touch stamp/download-syslinux
+
+stamp/fetch-syslinux: stamp/download-syslinux
 	cd src && tar -xvf ../dist/syslinux_orig.tar.xz
 	cd src && mv syslinux-6.04~git20190206.bf6db5b4 syslinux
 	cd src/syslinux && tar -xvf ../../dist/syslinux_pkg.tar.xz
 	cd src/syslinux && QUILT_PATCHES=debian/patches quilt push -a
 	cd src/syslinux && patch -p1 < ../../patches/0030-fix-e88.patch
-	touch stamp/fetch-syslinux		
+	touch stamp/fetch-syslinux
 
 kernelmenuconfig: stamp/fetch-kernel
 	cp config/kernel.config src/$(LINUX_DIR)/.config
@@ -57,17 +66,20 @@ build-syslinux: stamp/fetch-syslinux
 	cd src/syslinux && make bios PYTHON=python3 
 	cd src/syslinux && make bios install INSTALLROOT=`pwd`/../../out/syslinux PYTHON=python3
 
+download-all: stamp/download-kernel stamp/download-busybox stamp/download-syslinux
+	echo OK
+
 build-kernel: stamp/fetch-kernel build-busybox build-initramfs
 	-mkdir out
 	cp config/kernel.config src/$(LINUX_DIR)/.config
-	cd src/$(LINUX_DIR) && $(MAKE) -j4 ARCH=x86 CROSS_COMPILE=i486-linux-musl-
+	cd src/$(LINUX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
 	cp src/$(LINUX_DIR)/arch/x86/boot/bzImage out/bzImage
 
 build-busybox: stamp/fetch-busybox
 	-mkdir -p out/initramfs
 	cp config/busybox.config src/$(BUSYBOX_DIR)/.config
-	cd src/$(BUSYBOX_DIR) && $(MAKE) -j4 ARCH=x86 CROSS_COMPILE=i486-linux-musl-
-	cd src/$(BUSYBOX_DIR) && $(MAKE) -j4 ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
+	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
+	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
 	cp -rv src/$(BUSYBOX_DIR)/_install/* out/initramfs
 
 build-initramfs:
