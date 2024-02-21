@@ -13,7 +13,7 @@ RUN make extract_all
 RUN make install -j$(nproc)
 
 ENV PATH="/opt/musl-cross/bin:${PATH}"
-RUN apk add --no-cache flex bc perl bison quilt rsync
+RUN apk add --no-cache flex bc perl bison quilt rsync python3 nasm xz dosfstools mtools
 RUN apk del gcc g++
 
 VOLUME /repo-src
