@@ -25,3 +25,5 @@ WORKDIR /repo
 COPY --chmod=755 docker/init.sh /init.sh
 COPY --chmod=755 docker/build.sh /usr/local/bin/flbuild
 ENTRYPOINT [ "/init.sh" ]
+
+VOLUME /out
