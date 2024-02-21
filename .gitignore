@@ -2,5 +2,5 @@ dist
 src
 stamp
 out
-floppy_linux.img
+*.img
 revisions

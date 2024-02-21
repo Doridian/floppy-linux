@@ -99,8 +99,11 @@ build-initramfs:
 	cp etc/inittab out/initramfs/etc/inittab
 	chmod +x out/initramfs/etc/inittab
 
-	cd out/initramfs && \
-	find . | cpio -o -H newc | bzip2 -9 > $(ROOT_DIR)/out/initramfs.cpio.bz2
+	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
+	genext2fs -L "rootfloppy" -q -m 0 -b 1440 -B 1024 -d out/initramfs floppy_linux2.img
+
+	#cd out/initramfs && \
+	#find . | cpio -o -H newc | bzip2 -9 > $(ROOT_DIR)/out/initramfs.cpio.bz2
 
 build-floppy: build-kernel build-initramfs build-syslinux
 	dd if=/dev/zero of=./floppy_linux.img bs=1k count=1440
@@ -108,7 +111,6 @@ build-floppy: build-kernel build-initramfs build-syslinux
 	out/syslinux/usr/bin/syslinux --install floppy_linux.img
 	mcopy -i floppy_linux.img config/syslinux.cfg ::
 	mcopy -i floppy_linux.img out/bzImage  ::
-	mcopy -i floppy_linux.img out/initramfs.cpio.bz2  ::rootfs.ram
 
 clean:
 	echo "Making a fresh build ..."
