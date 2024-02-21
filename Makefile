@@ -4,7 +4,7 @@ INITRAMFS_BASE=$(ROOT_DIR)/out/initramfs
 UBUNTU_SYSLINUX_ORIG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1.orig.tar.xz
 UBUNTU_SYSLINUX_PKG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1-3ubuntu1.debian.tar.xz
 
-LINUX_DIR=linux-6.4
+LINUX_DIR=linux-6.7.5
 LINUX_TARBALL=$(LINUX_DIR).tar.xz
 LINUX_KERNEL_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/$(LINUX_TARBALL)
 
@@ -72,7 +72,7 @@ download-all: stamp/download-kernel stamp/download-busybox stamp/download-syslin
 build-kernel: stamp/fetch-kernel build-busybox build-initramfs
 	-mkdir out
 	cp config/kernel.config src/$(LINUX_DIR)/.config
-	cd src/$(LINUX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
+	cd src/$(LINUX_DIR) && $(MAKE) -j$(nproc) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
 	cp src/$(LINUX_DIR)/arch/x86/boot/bzImage out/bzImage
 
 build-busybox: stamp/fetch-busybox
