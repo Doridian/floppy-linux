@@ -12,6 +12,9 @@ BUSYBOX_DIR=busybox-1.36.1
 BUSYBOX_TARBALL=$(BUSYBOX_DIR).tar.bz2
 BUSYBOX_URL=https://busybox.net/downloads/$(BUSYBOX_TARBALL)
 
+BUSYBOX_DIR_INITRAMFS=$(BUSYBOX_DIR)
+BUSYBOX_DIR_ROOTFS=busybox-1.36.1-rootfs
+
 .PHONY: all clean
 
 all: stamp/fetch-kernel \
@@ -27,7 +30,8 @@ stamp/download-kernel:
 
 stamp/fetch-kernel: stamp/download-kernel
 	cd src && tar -xvf ../dist/$(LINUX_TARBALL)
-	touch stamp/fetch-kernel		
+
+	touch stamp/fetch-kernel
 
 stamp/download-busybox:
 	-mkdir -p dist src stamp
@@ -36,6 +40,7 @@ stamp/download-busybox:
 
 stamp/fetch-busybox: stamp/download-busybox
 	cd src && tar -xvf ../dist/$(BUSYBOX_TARBALL)
+	cd src && cp -rp $(BUSYBOX_DIR) $(BUSYBOX_DIR_ROOTFS)
 	touch stamp/fetch-busybox		
 
 stamp/download-syslinux:
@@ -57,10 +62,15 @@ kernelmenuconfig: stamp/fetch-kernel
 	cd src/$(LINUX_DIR) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
 	cp src/$(LINUX_DIR)/.config config/kernel.config
 
-busyboxmenuconfig: stamp/fetch-busybox
-	cp config/busybox.config src/$(BUSYBOX_DIR)/.config
-	cd src/$(BUSYBOX_DIR) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
-	cp src/$(BUSYBOX_DIR)/.config config/busybox.config
+busyboxmenuconfig-initramfs: stamp/fetch-busybox
+	cp config/busybox-initramfs.config src/$(BUSYBOX_DIR_INITRAMFS)/.config
+	cd src/$(BUSYBOX_DIR_INITRAMFS) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
+	cp src/$(BUSYBOX_DIR_INITRAMFS)/.config config/busybox-initramfs.config
+
+busyboxmenuconfig-root: stamp/fetch-busybox
+	cp config/busybox-root.config src/$(BUSYBOX_DIR_ROOTFS)/.config
+	cd src/$(BUSYBOX_DIR_ROOTFS) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
+	cp src/$(BUSYBOX_DIR_ROOTFS)/.config config/busybox-root.config
 
 build-syslinux: stamp/fetch-syslinux
 	cd src/syslinux && make bios PYTHON=python3 
@@ -69,20 +79,29 @@ build-syslinux: stamp/fetch-syslinux
 download-all: stamp/download-kernel stamp/download-busybox stamp/download-syslinux
 	echo OK
 
-build-kernel: stamp/fetch-kernel build-busybox build-initramfs
+build-kernel: stamp/fetch-kernel build-initramfs
 	-mkdir out
+	-mkdir -p out/rootfs
 	cp config/kernel.config src/$(LINUX_DIR)/.config
-	cd src/$(LINUX_DIR) && $(MAKE) -j$(nproc) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
+	cd src/$(LINUX_DIR) && $(MAKE) -j4 ARCH=x86 CROSS_COMPILE=i486-linux-musl-
 	cp src/$(LINUX_DIR)/arch/x86/boot/bzImage out/bzImage
+	cd src/$(LINUX_DIR) && INSTALL_MOD_PATH=../../out/rootfs $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- modules_install
 
-build-busybox: stamp/fetch-busybox
+build-busybox-initramfs: stamp/fetch-busybox
 	-mkdir -p out/initramfs
-	cp config/busybox.config src/$(BUSYBOX_DIR)/.config
-	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
-	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
-	cp -rv src/$(BUSYBOX_DIR)/_install/* out/initramfs
+	cp config/busybox-initramfs.config src/$(BUSYBOX_DIR_INITRAMFS)/.config
+	cd src/$(BUSYBOX_DIR_INITRAMFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
+	cd src/$(BUSYBOX_DIR_INITRAMFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
+	cp -rv src/$(BUSYBOX_DIR_INITRAMFS)/_install/* out/initramfs
 
-build-initramfs:
+build-busybox-root: stamp/fetch-busybox
+	-mkdir -p out/rootfs
+	cp config/busybox-root.config src/$(BUSYBOX_DIR_ROOTFS)/.config
+	cd src/$(BUSYBOX_DIR_ROOTFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
+	cd src/$(BUSYBOX_DIR_ROOTFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
+	cp -rv src/$(BUSYBOX_DIR_ROOTFS)/_install/* out/rootfs
+
+build-initramfs: build-busybox-initramfs
 	-rm -rf out/initramfs/dev
 	-mkdir -p out/initramfs/dev
 
@@ -92,25 +111,46 @@ build-initramfs:
 	-rm -rf out/initramfs/proc
 	-mkdir -p out/initramfs/proc
 
-	mkdir -p out/initramfs/etc/init.d/
-	cp etc/rc out/initramfs/etc/init.d/rc
-	chmod +x out/initramfs/etc/init.d/rc
+	cp config/init.sh out/initramfs/init
+	chmod 755 out/initramfs/init
+	chown root:root out/initramfs/init
 
-	cp etc/inittab out/initramfs/etc/inittab
-	chmod +x out/initramfs/etc/inittab
+	cd out/initramfs && \
+	find . | cpio -o -H newc | xz --check=crc32 > $(ROOT_DIR)/out/initramfs.cpio.xz
+
+build-rootfs: build-busybox-root
+	-rm -rf out/rootfs/dev
+	-mkdir -p out/rootfs/dev
+
+	-rm -rf out/rootfs/sys
+	-mkdir -p out/rootfs/sys
+
+	-rm -rf out/rootfs/proc
+	-mkdir -p out/rootfs/proc
+
+	mkdir -p out/rootfs/etc/init.d/
+	cp etc/rc out/rootfs/etc/init.d/rc
+	chmod 755 out/rootfs/etc/init.d/rc
+	chown root:root out/rootfs/etc/init.d/rc
+
+	cp etc/inittab out/rootfs/etc/inittab
+	chmod 755 out/rootfs/etc/inittab
+	chown root:root out/rootfs/etc/inittab
 
 	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
-	genext2fs -L "rootfloppy" -q -m 0 -b 1440 -B 1024 -d out/initramfs floppy_linux2.img
+	mksquashfs out/rootfs floppy_linux2.img -noappend -comp xz -no-xattrs -no-exports
+	ls -la floppy_linux2.img
+	truncate -s 1440k floppy_linux2.img
+	#genext2fs -L "rootfloppy" -q -m 0 -b 1440 -B 1024 -d out/rootfs floppy_linux2.img
 
-	#cd out/initramfs && \
-	#find . | cpio -o -H newc | bzip2 -9 > $(ROOT_DIR)/out/initramfs.cpio.bz2
-
-build-floppy: build-kernel build-initramfs build-syslinux
-	dd if=/dev/zero of=./floppy_linux.img bs=1k count=1440
-	mkdosfs floppy_linux.img
+build-floppy: build-kernel build-initramfs build-syslinux build-rootfs
+	#dd if=/dev/zero of=./floppy_linux.img bs=1k count=1440
+	#mkdosfs floppy_linux.img
+	cp blank.img floppy_linux.img
 	out/syslinux/usr/bin/syslinux --install floppy_linux.img
 	mcopy -i floppy_linux.img config/syslinux.cfg ::
 	mcopy -i floppy_linux.img out/bzImage  ::
+	mcopy -i floppy_linux.img out/initramfs.cpio.xz  ::rootfs.ram
 
 clean:
 	echo "Making a fresh build ..."
