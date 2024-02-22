@@ -4,16 +4,14 @@ INITRAMFS_BASE=$(ROOT_DIR)/out/initramfs
 UBUNTU_SYSLINUX_ORIG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1.orig.tar.xz
 UBUNTU_SYSLINUX_PKG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1-3ubuntu1.debian.tar.xz
 
-LINUX_DIR=linux-6.7.5
+LINUX_VERSION=6.7.5
+LINUX_DIR=linux-$(LINUX_VERSION)
 LINUX_TARBALL=$(LINUX_DIR).tar.xz
 LINUX_KERNEL_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/$(LINUX_TARBALL)
 
 BUSYBOX_DIR=busybox-1.36.1
 BUSYBOX_TARBALL=$(BUSYBOX_DIR).tar.bz2
 BUSYBOX_URL=https://busybox.net/downloads/$(BUSYBOX_TARBALL)
-
-BUSYBOX_DIR_INITRAMFS=$(BUSYBOX_DIR)
-BUSYBOX_DIR_ROOTFS=busybox-1.36.1-rootfs
 
 .PHONY: all clean
 
@@ -40,7 +38,6 @@ stamp/download-busybox:
 
 stamp/fetch-busybox: stamp/download-busybox
 	cd src && tar -xvf ../dist/$(BUSYBOX_TARBALL)
-	cd src && cp -rp $(BUSYBOX_DIR) $(BUSYBOX_DIR_ROOTFS)
 	touch stamp/fetch-busybox		
 
 stamp/download-syslinux:
@@ -62,15 +59,10 @@ kernelmenuconfig: stamp/fetch-kernel
 	cd src/$(LINUX_DIR) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
 	cp src/$(LINUX_DIR)/.config config/kernel.config
 
-busyboxmenuconfig-initramfs: stamp/fetch-busybox
-	cp config/busybox-initramfs.config src/$(BUSYBOX_DIR_INITRAMFS)/.config
-	cd src/$(BUSYBOX_DIR_INITRAMFS) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
-	cp src/$(BUSYBOX_DIR_INITRAMFS)/.config config/busybox-initramfs.config
-
 busyboxmenuconfig-root: stamp/fetch-busybox
-	cp config/busybox-root.config src/$(BUSYBOX_DIR_ROOTFS)/.config
-	cd src/$(BUSYBOX_DIR_ROOTFS) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
-	cp src/$(BUSYBOX_DIR_ROOTFS)/.config config/busybox-root.config
+	cp config/busybox-root.config src/$(BUSYBOX_DIR)/.config
+	cd src/$(BUSYBOX_DIR) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
+	cp src/$(BUSYBOX_DIR)/.config config/busybox-root.config
 
 build-syslinux: stamp/fetch-syslinux
 	cd src/syslinux && make bios PYTHON=python3 
@@ -86,22 +78,16 @@ build-kernel: stamp/fetch-kernel build-initramfs
 	cd src/$(LINUX_DIR) && $(MAKE) -j4 ARCH=x86 CROSS_COMPILE=i486-linux-musl-
 	cp src/$(LINUX_DIR)/arch/x86/boot/bzImage out/bzImage
 	cd src/$(LINUX_DIR) && INSTALL_MOD_PATH=../../out/rootfs $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- modules_install
-
-build-busybox-initramfs: stamp/fetch-busybox
-	-mkdir -p out/initramfs
-	cp config/busybox-initramfs.config src/$(BUSYBOX_DIR_INITRAMFS)/.config
-	cd src/$(BUSYBOX_DIR_INITRAMFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
-	cd src/$(BUSYBOX_DIR_INITRAMFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
-	cp -rv src/$(BUSYBOX_DIR_INITRAMFS)/_install/* out/initramfs
+	depmod -b out/rootfs $(LINUX_VERSION)
 
 build-busybox-root: stamp/fetch-busybox
 	-mkdir -p out/rootfs
-	cp config/busybox-root.config src/$(BUSYBOX_DIR_ROOTFS)/.config
-	cd src/$(BUSYBOX_DIR_ROOTFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
-	cd src/$(BUSYBOX_DIR_ROOTFS) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
-	cp -rv src/$(BUSYBOX_DIR_ROOTFS)/_install/* out/rootfs
+	cp config/busybox-root.config src/$(BUSYBOX_DIR)/.config
+	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
+	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
+	cp -rv src/$(BUSYBOX_DIR)/_install/* out/rootfs
 
-build-initramfs: build-busybox-initramfs
+build-initramfs:
 	-rm -rf out/initramfs/dev
 	-mkdir -p out/initramfs/dev
 
@@ -111,7 +97,11 @@ build-initramfs: build-busybox-initramfs
 	-rm -rf out/initramfs/proc
 	-mkdir -p out/initramfs/proc
 
-	cp config/init.sh out/initramfs/init
+	-rm -rf out/initramfs/mnt
+	-mkdir -p out/initramfs/mnt
+
+	-rm -f out/initramfs/init
+	gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/switch_root.c config/init.c -o out/initramfs/init
 	chmod 755 out/initramfs/init
 	chown root:root out/initramfs/init
 
