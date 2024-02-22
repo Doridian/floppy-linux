@@ -118,6 +118,15 @@ build-rootfs: build-busybox-root
 	-rm -rf out/rootfs/proc
 	-mkdir -p out/rootfs/proc
 
+	-rm -rf out/rootfs/root
+	-mkdir -p out/rootfs/root
+
+	-rm -rf out/rootfs/home
+	-mkdir -p out/rootfs/home
+
+	-rm -rf out/rootfs/tmp
+	-mkdir -p out/rootfs/tmp
+
 	mkdir -p out/rootfs/etc/init.d/
 	cp etc/rc out/rootfs/etc/init.d/rc
 	chmod 755 out/rootfs/etc/init.d/rc
@@ -126,6 +135,34 @@ build-rootfs: build-busybox-root
 	cp etc/inittab out/rootfs/etc/inittab
 	chmod 755 out/rootfs/etc/inittab
 	chown root:root out/rootfs/etc/inittab
+
+	cp etc/passwd out/rootfs/etc/passwd
+	chmod 644 out/rootfs/etc/passwd
+	chown root:root out/rootfs/etc/passwd
+
+	cp etc/group out/rootfs/etc/group
+	chmod 644 out/rootfs/etc/group
+	chown root:root out/rootfs/etc/group
+
+	cp etc/hosts out/rootfs/etc/hosts
+	chmod 644 out/rootfs/etc/hosts
+	chown root:root out/rootfs/etc/hosts
+
+	cp etc/hostname out/rootfs/etc/hostname
+	chmod 644 out/rootfs/etc/hostname
+	chown root:root out/rootfs/etc/hostname
+
+	cp etc/resolv.conf out/rootfs/etc/resolv.conf
+	chmod 644 out/rootfs/etc/resolv.conf
+	chown root:root out/rootfs/etc/resolv.conf
+
+	cp etc/passwd out/rootfs/etc/passwd
+	chmod 644 out/rootfs/etc/passwd
+	chown root:root out/rootfs/etc/passwd
+
+	cp etc/shadow out/rootfs/etc/shadow
+	chmod 600 out/rootfs/etc/shadow
+	chown root:root out/rootfs/etc/shadow
 
 	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
 	mksquashfs out/rootfs floppy_linux2.img -noappend -comp xz -no-xattrs -no-exports

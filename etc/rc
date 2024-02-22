@@ -9,7 +9,7 @@ mount -t sysfs none /sys
 mkdir -p /dev/pts
 mount -t devpts devpts /dev/pts
 
+mount -t tmpfs none /tmp
+
 echo /sbin/mdev > /proc/sys/kernel/hotplug
 mdev -s
-
-exec /bin/sh
