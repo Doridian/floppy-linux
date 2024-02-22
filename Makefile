@@ -127,7 +127,14 @@ build-rootfs: build-busybox-root
 	-rm -rf out/rootfs/tmp
 	-mkdir -p out/rootfs/tmp
 
-	mkdir -p out/rootfs/etc/init.d/
+	-rm -rf out/rootfs/var/run
+	-mkdir -p out/rootfs/var/run
+
+	-rm -rf out/rootfs/run
+	ln -s ../var/run out/rootfs/run
+
+	mkdir -p out/rootfs/etc/init.d/ out/rootfs/etc/network/
+
 	cp etc/rc out/rootfs/etc/init.d/rc
 	chmod 755 out/rootfs/etc/init.d/rc
 	chown root:root out/rootfs/etc/init.d/rc
@@ -152,10 +159,13 @@ build-rootfs: build-busybox-root
 	chmod 644 out/rootfs/etc/hostname
 	chown root:root out/rootfs/etc/hostname
 
-	cp etc/resolv.conf out/rootfs/etc/resolv.conf
-	chmod 644 out/rootfs/etc/resolv.conf
-	chown root:root out/rootfs/etc/resolv.conf
+	ln -sf /tmp/etc/resolv.conf out/rootfs/etc/resolv.conf
 
+	echo '#!/bin/sh' > out/rootfs/usr/bin/run-parts
+	echo 'exit 0' >> out/rootfs/usr/bin/run-parts
+	chmod 755 out/rootfs/usr/bin/run-parts
+	chown root:root out/rootfs/usr/bin/run-parts
+ 
 	cp etc/passwd out/rootfs/etc/passwd
 	chmod 644 out/rootfs/etc/passwd
 	chown root:root out/rootfs/etc/passwd
@@ -163,6 +173,15 @@ build-rootfs: build-busybox-root
 	cp etc/shadow out/rootfs/etc/shadow
 	chmod 600 out/rootfs/etc/shadow
 	chown root:root out/rootfs/etc/shadow
+
+	cp etc/network/interfaces out/rootfs/etc/network/interfaces
+	chmod 644 out/rootfs/etc/network/interfaces
+	chown root:root out/rootfs/etc/network/interfaces
+ 
+	-mkdir -p out/rootfs/usr/share/udhcpc
+	cp etc/udhcpc.script out/rootfs/usr/share/udhcpc/default.script
+	chmod 755 out/rootfs/usr/share/udhcpc/default.script
+	chown root:root out/rootfs/usr/share/udhcpc/default.script
 
 	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
 	mksquashfs out/rootfs floppy_linux2.img -noappend -comp xz -no-xattrs -no-exports
