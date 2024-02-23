@@ -15,7 +15,7 @@
 
 #define SQUASHFS_MAGIC 0x73717368
 
-static int switch_root_main(char *newroot, char *newinit)
+static int switch_root(char *newroot, char *newinit)
 {
 	if (chdir(newroot)) {
 		perror("chdir_newroot");
@@ -27,13 +27,14 @@ static int switch_root_main(char *newroot, char *newinit)
         return 1;
 	}
 
-	if (unlink("/init")) {
-		perror("unlink_init");
-		return 1;
-	}
-
-	chroot(".");
-    chdir("/");
+	if (chroot(".")) {
+        perror("chroot_newroot");
+        return 1;
+    }
+    if (chdir("/")) {
+        perror("chdir_newroot");
+        return 1;
+    }
 
 	execl(newinit, newinit, NULL);
 	perror("exec_init");
@@ -76,6 +77,57 @@ static int load_overlay_kmod() {
     return execl("/sbin/modprobe", "/sbin/modprobe", "overlay", NULL);
 }
 
+static int mount_floppy(const char* fn) {
+    if(mount(fn, "/floppy", "squashfs", MS_RDONLY, NULL)) {
+        perror("mount_floppy");
+        return 1;
+    }
+    printf("Floppy disk mounted!\n");
+    printf("Loading overlay kmod...\n");
+    if (load_overlay_kmod()) {
+        perror("load_overlay_kmod");
+        return 1;
+    }
+    printf("Mounting overlay...\n");
+    if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmpfs/upper,workdir=/tmpfs/work")) {
+        perror("mount_overlay");
+        return 1;
+    }
+    printf("Mounting /overlay/floppy...\n");
+    if(mount("/floppy", "/newroot/overlay/floppy", NULL, MS_MOVE, NULL)) {
+        perror("mount_move_floppy");
+        return 1;
+    }
+    printf("Mounting /overlay/tmpfs...\n");
+    if (mount("/tmpfs", "/newroot/overlay/tmpfs", NULL, MS_MOVE, NULL)) {
+        perror("mount_move_tmpfs");
+        return 1;
+    }
+    printf("Unmounting old /dev...\n");
+    if (umount("/dev")) {
+        perror("umount_dev");
+        return 1;
+    }
+    printf("Removing old /dev entries...\n");
+    if (unlink("/dev/console") || unlink("/dev/tty0")) {
+        perror("rm_old_dev");
+        return 1;
+    }
+    printf("Removing old /tmpfs, /dev and /floppy...\n");
+    if (rmdir("/dev") || rmdir("/tmpfs") || rmdir("/floppy")) {
+        perror("rm_old_dirs");
+        return 1;
+    }
+    printf("Removing self...\n");
+    if (unlink("/init")) {
+        perror("rm_self");
+        return 1;
+    }
+    printf("Switching root...\n");
+    switch_root("/newroot", "/sbin/init");
+    return 1;
+}
+
 int main() {
     if(mount("none", "/dev", "devtmpfs", 0, NULL)) {
         perror("mount_devtmpfs");
@@ -104,35 +156,7 @@ int main() {
             printf("Querying device: %s\n", fn);
             if (check_floppy(fn)) {
                 printf("Floppy disk detected: %s\n", fn);
-                if(mount(fn, "/floppy", "squashfs", MS_RDONLY, NULL)) {
-                    perror("mount_floppy");
-                    return 1;
-                }
-                printf("Floppy disk mounted!\n");
-                printf("Loading overlay kmod...\n");
-                if (load_overlay_kmod()) {
-                    perror("load_overlay_kmod");
-                    return 1;
-                }
-                printf("Mounting overlay...\n");
-                if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmpfs/upper,workdir=/tmpfs/work")) {
-                    perror("mount_overlay");
-                    return 1;
-                }
-                printf("Mounting /overlay/floppy...\n");
-                if(mount(fn, "/newroot/overlay/floppy", "squashfs", MS_RDONLY, NULL)) {
-                    perror("mount_floppyroot");
-                    return 1;
-                }
-                printf("Mounting /overlay/tmpfs...\n");
-                if (mount("/tmpfs", "/newroot/overlay/tmpfs", NULL, MS_BIND, NULL)) {
-                    perror("mount_bind_tmp");
-                    return 1;
-                }
-                printf("Switching root...\n");
-                switch_root_main("/newroot", "/sbin/init");
-                perror("switch_root_main");
-                return 1;
+                return mount_floppy(fn);
             }
         }
 
