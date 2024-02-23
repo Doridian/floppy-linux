@@ -9,9 +9,36 @@
 #include <stdint.h>
 #include <time.h>
 
-int switch_root_main(char *newroot, char *newinit);
+#ifndef MS_MOVE
+# define MS_MOVE     8192
+#endif
 
 #define SQUASHFS_MAGIC 0x73717368
+
+static int switch_root_main(char *newroot, char *newinit)
+{
+	if (chdir(newroot)) {
+		perror("chdir_newroot");
+		return 1;
+	}
+
+	if (mount(".", "/", NULL, MS_MOVE, NULL)) {
+		perror("mount_move_root");
+        return 1;
+	}
+
+	if (unlink("/init")) {
+		perror("unlink_init");
+		return 1;
+	}
+
+	chroot(".");
+    chdir("/");
+
+	execl(newinit, newinit, NULL);
+	perror("exec_init");
+    return 1;
+}
 
 static int check_floppy(const char* fname) {
     int fd = open(fname, O_RDONLY);
@@ -31,7 +58,7 @@ static int check_floppy(const char* fname) {
     return 0;
 }
 
-static int fork_and_chroot_and_load_overlayfs() {
+static int load_overlay_kmod() {
     pid_t pid = fork();
     if (pid < 0) {
         return -1;
@@ -78,17 +105,22 @@ int main() {
                     return 1;
                 }
                 printf("Floppy disk mounted!\n");
-                printf("Loading overlayfs kmod...\n");
-                int overlayload = fork_and_chroot_and_load_overlayfs();
-                if (overlayload) {
-                    perror("fork_and_chroot_and_load_overlayfs");
+                printf("Loading overlay kmod...\n");
+                if (load_overlay_kmod()) {
+                    perror("load_overlay_kmod");
                     return 1;
                 }
-                printf("Loading overlayfs...\n");
+                printf("Mounting overlay...\n");
                 if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmp/upper,workdir=/tmp/work")) {
                     perror("mount_overlay");
                     return 1;
                 }
+                printf("Mounting real floppy root to /newroot/floppyroot...\n");
+                if(mount(fn, "/newroot/floppyroot", "squashfs", MS_RDONLY, NULL)) {
+                    perror("mount_floppyroot");
+                    return 1;
+                }
+                printf("Switching root...\n");
                 switch_root_main("/newroot", "/sbin/init");
                 perror("switch_root_main");
                 return 1;

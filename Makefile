@@ -96,7 +96,7 @@ build-initramfs:
 	mknod -m 622 out/initramfs/dev/tty0 c 4 0
 
 	-rm -f out/initramfs/init
-	gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/switch_root.c config/init.c -o out/initramfs/init
+	gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/init.c -o out/initramfs/init
 	strip --strip-all out/initramfs/init
 	chmod 755 out/initramfs/init
 	chown root:root out/initramfs/init
@@ -117,6 +117,9 @@ build-rootfs: build-busybox
 
 	-rm -rf out/rootfs/root
 	-mkdir -p out/rootfs/root
+
+	-rm -rf out/rootfs/floppyroot
+	-mkdir -p out/rootfs/floppyroot
 
 	-rm -rf out/rootfs/home
 	-mkdir -p out/rootfs/home
