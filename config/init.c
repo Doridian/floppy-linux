@@ -69,7 +69,11 @@ static int load_overlay_kmod() {
         return WEXITSTATUS(status);
     }
 
-    return execl("/floppy/bin/busybox", "chroot", "/floppy", "/sbin/modprobe", "overlay", NULL);
+    if (chroot("/floppy")) {
+        return 1;
+    }
+
+    return execl("/sbin/modprobe", "/sbin/modprobe", "overlay", NULL);
 }
 
 int main() {
