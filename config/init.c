@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/mount.h>
 #include <stdint.h>
+#include <time.h>
 
 int switch_root_main(char *newroot, char *newinit);
 
@@ -54,7 +55,7 @@ int main() {
 
         printf("No floppy disk detected, hit ENTER to retry...\n");
         if (getc(stdin) <= 0) {
-            return 0;
+            sleep(1);
         }
     }
 

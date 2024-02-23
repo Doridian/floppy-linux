@@ -1,9 +1,6 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 INITRAMFS_BASE=$(ROOT_DIR)/out/initramfs
 
-#UBUNTU_SYSLINUX_ORIG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1.orig.tar.xz
-#UBUNTU_SYSLINUX_PKG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1-3ubuntu1.debian.tar.xz
-
 BOOTLOADER_ORIG=https://github.com/Doridian/tiny-floppy-bootloader/archive/1a6b154a398ad16b0f408e312ac523367acd61bf.tar.gz
 
 LINUX_VERSION=6.7.5
@@ -91,7 +88,8 @@ build-initramfs:
 	-rm -rf out/initramfs/mnt
 	-mkdir -p out/initramfs/mnt
 
-	mknod -m 640 out/initramfs/dev/console c 136 0
+	mknod -m 622 out/initramfs/dev/console c 5 1
+	mknod -m 622 out/initramfs/dev/tty0 c 4 0
 
 	-rm -f out/initramfs/init
 	gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/switch_root.c config/init.c -o out/initramfs/init
@@ -185,11 +183,6 @@ build-rootfs: build-busybox-root
 	#genext2fs -L "rootfloppy" -q -m 0 -b 1440 -B 1024 -d out/rootfs floppy_linux2.img
 
 build-floppy: build-kernel build-initramfs build-bootloader build-rootfs
-	#dd if=/dev/zero of=./floppy_linux.img bs=1k count=1440
-	#mkdosfs -R 1 -r 16 -f 1 -F 12 floppy_linux.img
-	#out/syslinux/usr/bin/syslinux --install floppy_linux.img
-	#mcopy -i floppy_linux.img out/bzImage ::kern.img
-	#mcopy -i floppy_linux.img config/syslinux.cfg ::
 	rm -f floppy_linux.img
 	cd src/bootloader && ./build.sh ../../out/bzImage ../../floppy_linux.img
 
