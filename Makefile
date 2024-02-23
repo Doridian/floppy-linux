@@ -183,9 +183,6 @@ build-rootfs: build-busybox
 	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
 
 	rm -rf out/rootfs/lib/modules/*/kernel/sound
-	rm -rf out/rootfs/lib/modules/*/kernel/fs/fat
-	rm -rf out/rootfs/lib/modules/*/kernel/fs/jbd2
-	rm -rf out/rootfs/lib/modules/*/kernel/fs/ext4
 
 	mksquashfs out/rootfs floppy_linux2.img -noappend -comp xz -no-xattrs -no-exports
 	ls -la floppy_linux2.img
