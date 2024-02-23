@@ -101,7 +101,7 @@ build-initramfs:
 	find . | cpio -o -H newc > $(ROOT_DIR)/out/initramfs.cpio
 	cat $(ROOT_DIR)/out/initramfs.cpio | xz --check=none > $(ROOT_DIR)/out/initramfs.cpio.xz
 
-build-rootfs: build-busybox-root
+build-rootfs: build-busybox
 	-rm -rf out/rootfs/dev
 	-mkdir -p out/rootfs/dev
 
