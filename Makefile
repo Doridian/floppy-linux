@@ -85,8 +85,12 @@ build-busybox: stamp/fetch-busybox
 build-initramfs:
 	-rm -rf out/initramfs/dev
 	-mkdir -p out/initramfs/dev
-	-rm -rf out/initramfs/mnt
-	-mkdir -p out/initramfs/mnt
+	-rm -rf out/initramfs/floppy
+	-mkdir -p out/initramfs/floppy
+	-rm -rf out/initramfs/tmp
+	-mkdir -p out/initramfs/tmp
+	-rm -rf out/initramfs/newroot
+	-mkdir -p out/initramfs/newroot
 
 	mknod -m 622 out/initramfs/dev/console c 5 1
 	mknod -m 622 out/initramfs/dev/tty0 c 4 0
@@ -124,7 +128,7 @@ build-rootfs: build-busybox
 	-mkdir -p out/rootfs/var/run
 
 	-rm -rf out/rootfs/run
-	ln -s ../var/run out/rootfs/run
+	ln -sf var/run out/rootfs/run
 
 	mkdir -p out/rootfs/etc/init.d/ out/rootfs/etc/network/
 
@@ -151,8 +155,6 @@ build-rootfs: build-busybox
 	cp etc/hostname out/rootfs/etc/hostname
 	chmod 644 out/rootfs/etc/hostname
 	chown root:root out/rootfs/etc/hostname
-
-	ln -sf /tmp/etc/resolv.conf out/rootfs/etc/resolv.conf
 
 	echo '#!/bin/sh' > out/rootfs/usr/bin/run-parts
 	echo 'exit 0' >> out/rootfs/usr/bin/run-parts

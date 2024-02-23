@@ -1,7 +1,11 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -27,9 +31,36 @@ static int check_floppy(const char* fname) {
     return 0;
 }
 
+static int fork_and_chroot_and_load_overlayfs() {
+    pid_t pid = fork();
+    if (pid < 0) {
+        return -1;
+    }
+    if (pid > 0) {
+        int status;
+        waitpid(pid, &status, 0);
+        return WEXITSTATUS(status);
+    }
+
+    return execl("/floppy/bin/busybox", "chroot", "/floppy", "/sbin/modprobe", "overlay", NULL);
+}
+
 int main() {
     if(mount("none", "/dev", "devtmpfs", 0, NULL)) {
         perror("mount_devtmpfs");
+        return 1;
+    }
+
+    if(mount("none", "/tmp", "tmpfs", 0, NULL)) {
+        perror("mount_tmpfs");
+        return 1;
+    }
+    if(mkdir("/tmp/work", 0755)) {
+        perror("mkdir_tmp_work");
+        return 1;
+    }
+    if(mkdir("/tmp/upper", 0755)) {
+        perror("mkdir_tmp_upper");
         return 1;
     }
 
@@ -42,14 +73,25 @@ int main() {
             printf("Querying device: %s\n", fn);
             if (check_floppy(fn)) {
                 printf("Floppy disk detected: %s\n", fn);
-                if(mount(fn, "/mnt", "squashfs", MS_RDONLY, NULL)) {
+                if(mount(fn, "/floppy", "squashfs", MS_RDONLY, NULL)) {
                     perror("mount_floppy");
-                    return 2;
+                    return 1;
                 }
-                printf("Floppy disk mounted!\nRunning switch_root...\n");
-                switch_root_main("/mnt", "/sbin/init");
+                printf("Floppy disk mounted!\n");
+                printf("Loading overlayfs kmod...\n");
+                int overlayload = fork_and_chroot_and_load_overlayfs();
+                if (overlayload) {
+                    perror("fork_and_chroot_and_load_overlayfs");
+                    return 1;
+                }
+                printf("Loading overlayfs...\n");
+                if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmp/upper,workdir=/tmp/work")) {
+                    perror("mount_overlay");
+                    return 1;
+                }
+                switch_root_main("/newroot", "/sbin/init");
                 perror("switch_root_main");
-                return 3;
+                return 1;
             }
         }
 
@@ -59,5 +101,5 @@ int main() {
         }
     }
 
-    return 4;
+    return 1;
 }
