@@ -1,8 +1,10 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 INITRAMFS_BASE=$(ROOT_DIR)/out/initramfs
 
-UBUNTU_SYSLINUX_ORIG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1.orig.tar.xz
-UBUNTU_SYSLINUX_PKG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1-3ubuntu1.debian.tar.xz
+#UBUNTU_SYSLINUX_ORIG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1.orig.tar.xz
+#UBUNTU_SYSLINUX_PKG=http://archive.ubuntu.com/ubuntu/pool/main/s/syslinux/syslinux_6.04~git20190206.bf6db5b4+dfsg1-3ubuntu1.debian.tar.xz
+
+BOOTLOADER_ORIG=https://github.com/Doridian/tiny-floppy-bootloader/archive/1a6b154a398ad16b0f408e312ac523367acd61bf.tar.gz
 
 LINUX_VERSION=6.7.5
 LINUX_DIR=linux-$(LINUX_VERSION)
@@ -40,19 +42,19 @@ stamp/fetch-busybox: stamp/download-busybox
 	cd src && tar -xvf ../dist/$(BUSYBOX_TARBALL)
 	touch stamp/fetch-busybox		
 
-stamp/download-syslinux:
+stamp/download-bootloader:
 	-mkdir -p dist src stamp
-	cd dist && wget $(UBUNTU_SYSLINUX_ORIG) -O syslinux_orig.tar.xz
-	cd dist && wget $(UBUNTU_SYSLINUX_PKG) -O syslinux_pkg.tar.xz
-	touch stamp/download-syslinux
+	cd dist && wget $(BOOTLOADER_ORIG) -O bootloader.tar.gz
+	touch stamp/download-bootloader
 
-stamp/fetch-syslinux: stamp/download-syslinux
-	cd src && tar -xvf ../dist/syslinux_orig.tar.xz
-	cd src && mv syslinux-6.04~git20190206.bf6db5b4 syslinux
-	cd src/syslinux && tar -xvf ../../dist/syslinux_pkg.tar.xz
-	cd src/syslinux && QUILT_PATCHES=debian/patches quilt push -a
-	cd src/syslinux && patch -p1 < ../../patches/0030-fix-e88.patch
-	touch stamp/fetch-syslinux
+stamp/fetch-bootloader: stamp/download-bootloader
+	-mkdir -p src/bootloader
+	cd src && tar -xvf ../dist/bootloader.tar.gz -C bootloader --strip-components=1
+	#cd src/bootloader && patch -p0 -i ../../config/bootloader.patch
+	touch stamp/fetch-bootloader
+
+build-bootloader: stamp/fetch-bootloader
+	echo OK
 
 kernelmenuconfig: stamp/fetch-kernel
 	cp config/kernel.config src/$(LINUX_DIR)/.config
@@ -64,11 +66,7 @@ busyboxmenuconfig-root: stamp/fetch-busybox
 	cd src/$(BUSYBOX_DIR) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
 	cp src/$(BUSYBOX_DIR)/.config config/busybox-root.config
 
-build-syslinux: stamp/fetch-syslinux
-	cd src/syslinux && make bios PYTHON=python3 
-	cd src/syslinux && make bios install INSTALLROOT=`pwd`/../../out/syslinux PYTHON=python3
-
-download-all: stamp/download-kernel stamp/download-busybox stamp/download-syslinux
+download-all: stamp/download-kernel stamp/download-busybox stamp/download-bootloader
 	echo OK
 
 build-kernel: stamp/fetch-kernel build-initramfs
@@ -90,23 +88,20 @@ build-busybox-root: stamp/fetch-busybox
 build-initramfs:
 	-rm -rf out/initramfs/dev
 	-mkdir -p out/initramfs/dev
-
-	-rm -rf out/initramfs/sys
-	-mkdir -p out/initramfs/sys
-
-	-rm -rf out/initramfs/proc
-	-mkdir -p out/initramfs/proc
-
 	-rm -rf out/initramfs/mnt
 	-mkdir -p out/initramfs/mnt
 
+	mknod -m 640 out/initramfs/dev/console c 136 0
+
 	-rm -f out/initramfs/init
 	gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/switch_root.c config/init.c -o out/initramfs/init
+	strip --strip-all out/initramfs/init
 	chmod 755 out/initramfs/init
 	chown root:root out/initramfs/init
 
 	cd out/initramfs && \
-	find . | cpio -o -H newc | xz --check=crc32 > $(ROOT_DIR)/out/initramfs.cpio.xz
+	find . | cpio -o -H newc > $(ROOT_DIR)/out/initramfs.cpio
+	cat $(ROOT_DIR)/out/initramfs.cpio | xz --check=none > $(ROOT_DIR)/out/initramfs.cpio.xz
 
 build-rootfs: build-busybox-root
 	-rm -rf out/rootfs/dev
@@ -189,14 +184,14 @@ build-rootfs: build-busybox-root
 	truncate -s 1440k floppy_linux2.img
 	#genext2fs -L "rootfloppy" -q -m 0 -b 1440 -B 1024 -d out/rootfs floppy_linux2.img
 
-build-floppy: build-kernel build-initramfs build-syslinux build-rootfs
+build-floppy: build-kernel build-initramfs build-bootloader build-rootfs
 	#dd if=/dev/zero of=./floppy_linux.img bs=1k count=1440
-	#mkdosfs floppy_linux.img
-	cp blank.img floppy_linux.img
-	out/syslinux/usr/bin/syslinux --install floppy_linux.img
-	mcopy -i floppy_linux.img config/syslinux.cfg ::
-	mcopy -i floppy_linux.img out/bzImage  ::
-	mcopy -i floppy_linux.img out/initramfs.cpio.xz  ::rootfs.ram
+	#mkdosfs -R 1 -r 16 -f 1 -F 12 floppy_linux.img
+	#out/syslinux/usr/bin/syslinux --install floppy_linux.img
+	#mcopy -i floppy_linux.img out/bzImage ::kern.img
+	#mcopy -i floppy_linux.img config/syslinux.cfg ::
+	rm -f floppy_linux.img
+	cd src/bootloader && ./build.sh ../../out/bzImage ../../floppy_linux.img
 
 clean:
 	echo "Making a fresh build ..."

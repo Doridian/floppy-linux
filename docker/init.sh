@@ -34,6 +34,7 @@ lncross objcopy
 lncross ranlib
 lncross objdump
 lncross nm
+lncross strip
 
 if [ -d /repo-src/.git ];
 then

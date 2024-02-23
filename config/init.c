@@ -32,10 +32,13 @@ int main() {
         return 1;
     }
 
+    printf("Scanning for root floppy...\n");
+
     while (1) {
         for (int i = 0; i < 10; i++) {
             char fn[32];
             sprintf(fn, "/dev/fd%d", i);
+            printf("Querying device: %s\n", fn);
             if (check_floppy(fn)) {
                 printf("Floppy disk detected: %s\n", fn);
                 if(mount(fn, "/mnt", "squashfs", 0, NULL)) {
