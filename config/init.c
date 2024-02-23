@@ -71,10 +71,13 @@ static int modprobe_from_floppy(const char* mod) {
     }
 
     if (chroot("/floppy")) {
+        exit(1);
         return 1;
     }
 
-    return execl("/sbin/modprobe", "/sbin/modprobe", mod, NULL);
+    execl("/sbin/modprobe", "/sbin/modprobe", mod, NULL);
+    exit(1);
+    return 1;
 }
 
 static int mount_floppy(const char* fn) {
