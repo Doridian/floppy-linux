@@ -42,7 +42,7 @@ int main() {
             printf("Querying device: %s\n", fn);
             if (check_floppy(fn)) {
                 printf("Floppy disk detected: %s\n", fn);
-                if(mount(fn, "/mnt", "squashfs", 0, NULL)) {
+                if(mount(fn, "/mnt", "squashfs", MS_RDONLY, NULL)) {
                     perror("mount_floppy");
                     return 2;
                 }
