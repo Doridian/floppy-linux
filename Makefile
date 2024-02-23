@@ -58,10 +58,10 @@ kernelmenuconfig: stamp/fetch-kernel
 	cd src/$(LINUX_DIR) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
 	cp src/$(LINUX_DIR)/.config config/kernel.config
 
-busyboxmenuconfig-root: stamp/fetch-busybox
-	cp config/busybox-root.config src/$(BUSYBOX_DIR)/.config
+busyboxmenuconfig: stamp/fetch-busybox
+	cp config/busybox.config src/$(BUSYBOX_DIR)/.config
 	cd src/$(BUSYBOX_DIR) && make ARCH=x86 CROSS_COMPILE=i486-linux-musl- menuconfig
-	cp src/$(BUSYBOX_DIR)/.config config/busybox-root.config
+	cp src/$(BUSYBOX_DIR)/.config config/busybox.config
 
 download-all: stamp/download-kernel stamp/download-busybox stamp/download-bootloader
 	echo OK
@@ -75,9 +75,9 @@ build-kernel: stamp/fetch-kernel build-initramfs
 	cd src/$(LINUX_DIR) && INSTALL_MOD_PATH=../../out/rootfs $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- modules_install
 	depmod -b out/rootfs $(LINUX_VERSION)
 
-build-busybox-root: stamp/fetch-busybox
+build-busybox: stamp/fetch-busybox
 	-mkdir -p out/rootfs
-	cp config/busybox-root.config src/$(BUSYBOX_DIR)/.config
+	cp config/busybox.config src/$(BUSYBOX_DIR)/.config
 	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl-
 	cd src/$(BUSYBOX_DIR) && $(MAKE) ARCH=x86 CROSS_COMPILE=i486-linux-musl- install
 	cp -rv src/$(BUSYBOX_DIR)/_install/* out/rootfs
