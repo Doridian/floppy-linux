@@ -87,8 +87,8 @@ build-initramfs:
 	-mkdir -p out/initramfs/dev
 	-rm -rf out/initramfs/floppy
 	-mkdir -p out/initramfs/floppy
-	-rm -rf out/initramfs/tmp
-	-mkdir -p out/initramfs/tmp
+	-rm -rf out/initramfs/tmpfs
+	-mkdir -p out/initramfs/tmpfs
 	-rm -rf out/initramfs/newroot
 	-mkdir -p out/initramfs/newroot
 
@@ -118,8 +118,8 @@ build-rootfs: build-busybox
 	-rm -rf out/rootfs/root
 	-mkdir -p out/rootfs/root
 
-	-rm -rf out/rootfs/floppyroot
-	-mkdir -p out/rootfs/floppyroot
+	-rm -rf out/rootfs/overlay
+	-mkdir -p out/rootfs/overlay/floppy out/rootfs/overlay/tmpfs
 
 	-rm -rf out/rootfs/home
 	-mkdir -p out/rootfs/home

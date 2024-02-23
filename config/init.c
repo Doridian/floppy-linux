@@ -78,16 +78,16 @@ int main() {
         return 1;
     }
 
-    if(mount("none", "/tmp", "tmpfs", 0, NULL)) {
+    if(mount("none", "/tmpfs", "tmpfs", 0, NULL)) {
         perror("mount_tmpfs");
         return 1;
     }
-    if(mkdir("/tmp/work", 0755)) {
-        perror("mkdir_tmp_work");
+    if(mkdir("/tmpfs/work", 0755)) {
+        perror("mkdir_tmpfs_work");
         return 1;
     }
-    if(mkdir("/tmp/upper", 0755)) {
-        perror("mkdir_tmp_upper");
+    if(mkdir("/tmpfs/upper", 0755)) {
+        perror("mkdir_tmpfs_upper");
         return 1;
     }
 
@@ -111,13 +111,18 @@ int main() {
                     return 1;
                 }
                 printf("Mounting overlay...\n");
-                if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmp/upper,workdir=/tmp/work")) {
+                if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmpfs/upper,workdir=/tmpfs/work")) {
                     perror("mount_overlay");
                     return 1;
                 }
-                printf("Mounting real floppy root to /newroot/floppyroot...\n");
-                if(mount(fn, "/newroot/floppyroot", "squashfs", MS_RDONLY, NULL)) {
+                printf("Mounting /overlay/floppy...\n");
+                if(mount(fn, "/newroot/overlay/floppy", "squashfs", MS_RDONLY, NULL)) {
                     perror("mount_floppyroot");
+                    return 1;
+                }
+                printf("Mounting /overlay/tmpfs...\n");
+                if (mount("/tmpfs", "/newroot/overlay/tmpfs", NULL, MS_BIND, NULL)) {
+                    perror("mount_bind_tmp");
                     return 1;
                 }
                 printf("Switching root...\n");
