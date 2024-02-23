@@ -1,7 +1,7 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 INITRAMFS_BASE=$(ROOT_DIR)/out/initramfs
 
-BOOTLOADER_ORIG=https://github.com/Doridian/tiny-floppy-bootloader/archive/1a6b154a398ad16b0f408e312ac523367acd61bf.tar.gz
+BOOTLOADER_ORIG=https://github.com/Doridian/tiny-floppy-bootloader/archive/f8dfdbf62cb4993887bd4715714e42e3102227c0.tar.gz
 
 LINUX_VERSION=6.7.5
 LINUX_DIR=linux-$(LINUX_VERSION)
