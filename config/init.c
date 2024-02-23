@@ -59,7 +59,7 @@ static int check_floppy(const char* fname) {
     return 0;
 }
 
-static int load_overlay_kmod() {
+static int modprobe_from_floppy(const char* mod) {
     pid_t pid = fork();
     if (pid < 0) {
         return -1;
@@ -74,7 +74,7 @@ static int load_overlay_kmod() {
         return 1;
     }
 
-    return execl("/sbin/modprobe", "/sbin/modprobe", "overlay", NULL);
+    return execl("/sbin/modprobe", "/sbin/modprobe", mod, NULL);
 }
 
 static int mount_floppy(const char* fn) {
@@ -84,7 +84,7 @@ static int mount_floppy(const char* fn) {
     }
     printf("Floppy disk mounted!\n");
     printf("Loading overlay kmod...\n");
-    if (load_overlay_kmod()) {
+    if (modprobe_from_floppy("overlay")) {
         perror("load_overlay_kmod");
         return 1;
     }
