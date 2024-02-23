@@ -181,9 +181,9 @@ build-rootfs: build-busybox
 	chmod 755 out/rootfs/usr/share/udhcpc/default.script
 	chown root:root out/rootfs/usr/share/udhcpc/default.script
 
-	cp config/run.sh out/rootfs/bin/run.sh
-	chmod 755 out/rootfs/bin/run.sh
-	chown root:root out/rootfs/bin/run.sh
+	cp config/net.sh out/rootfs/bin/net.sh
+	chmod 755 out/rootfs/bin/net.sh
+	chown root:root out/rootfs/bin/net.sh
 
 	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
 
