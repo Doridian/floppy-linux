@@ -2,12 +2,18 @@
 set -eux
 
 DISKDEV="$1"
+shift 1
 echo "Copying disk image from $DISKDEV to /"
 
 TMPDIR="$(mktemp -d)"
-trap 'cd / && rm -rf $TMPDIR' EXIT
+safe_exit() {
+    cd /
+    umount "$TMPDIR" || true
+    rmdir "$TMPDIR"
+}
+trap 'safe_exit' EXIT
+trap 'exit 1' INT
 
-mount "$DISKDEV" "$TMPDIR"
-cp -i -a "$TMPDIR/." /
-umount "$TMPDIR"
-rmdir "$TMPDIR"
+mount -o ro "$DISKDEV" "$TMPDIR"
+mount -o remount,ro "$TMPDIR"
+cp -a "$@" "$TMPDIR/." /
