@@ -226,44 +226,6 @@ static int floppy_mode_from_char(const char c) {
     return FLOPPY_MODE_UNKNOWN;
 }
 
-static void floppy_mode_timeout() {
-    exit(FLOPPY_MODE_UNKNOWN);
-}
-
-static int getc_floppy_mode_1s(const int mode, const int timeout_seconds_remain) {
-    pid_t pid = fork();
-    if (pid < 0) {
-        return -1;
-    }
-    if (pid > 0) {
-        int status;
-        waitpid(pid, &status, 0);
-        return WEXITSTATUS(status);
-    }
-
-    char dmode = 'd';
-    char omode = 'o';
-    char cmode = 'c';
-
-    if (mode == FLOPPY_MODE_DIRECT) {
-        dmode = 'D';
-    } else if (mode == FLOPPY_MODE_OVERLAY) {
-        omode = 'O';
-    } else if (mode == FLOPPY_MODE_COPY) {
-        cmode = 'C';
-    }
-
-    printf("\r\nTo manually override the floppy mode, within %d seconds, please\r\nchoose (D)irect, (O)verlay or (O)opy [%c%c%c]: ", timeout_seconds_remain, dmode, omode, cmode);
-    fflush(stdout);
-
-    signal(SIGALRM, floppy_mode_timeout);
-    alarm(1);
-    int newmode = floppy_mode_from_char(getchar());
-    alarm(0);
-    exit(newmode);
-    return newmode;
-}
-
 int main(int argc, char *argv[]) {
     if(mount("none", "/dev", "devtmpfs", 0, NULL)) {
         perror("mount_devtmpfs");
@@ -279,10 +241,33 @@ int main(int argc, char *argv[]) {
     }
 
     set_tty_raw();
-    for (int timeout_seconds_remain = 15; timeout_seconds_remain > 0; timeout_seconds_remain--) {
-        const int newmode = getc_floppy_mode_1s(mode, timeout_seconds_remain);
-        if (newmode != FLOPPY_MODE_UNKNOWN) {
-            mode = newmode;
+    for (int timeout_seconds_remain = 5; timeout_seconds_remain > 0; timeout_seconds_remain--) {
+        char dmode = 'd';
+        char omode = 'o';
+        char cmode = 'c';
+
+        if (mode == FLOPPY_MODE_DIRECT) {
+            dmode = 'D';
+        } else if (mode == FLOPPY_MODE_OVERLAY) {
+            omode = 'O';
+        } else if (mode == FLOPPY_MODE_COPY) {
+            cmode = 'C';
+        }
+
+        printf("\r\nTo manually override the floppy mode, within %d seconds, please\r\nchoose (D)irect, (O)verlay or (O)opy [%c%c%c]: ", timeout_seconds_remain, dmode, omode, cmode);
+        fflush(stdout);
+
+        struct timeval timeout = {1, 0};
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(STDIN_FILENO, &fds);
+        int ret = select(1, &fds, NULL, NULL, &timeout);
+
+        if (ret > 0) {
+            int newmode = floppy_mode_from_char(getchar());
+            if (newmode != FLOPPY_MODE_UNKNOWN) {
+                mode = newmode;
+            }
             break;
         }
     }
