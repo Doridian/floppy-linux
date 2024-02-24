@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
+#include <termios.h>
 
 #ifndef MS_MOVE
 # define MS_MOVE     8192
@@ -40,6 +41,26 @@ static int switch_root(char *newroot, char *newinit)
 	execl(newinit, newinit, NULL);
 	perror("exec_init");
     return 1;
+}
+
+struct termios orig_term;
+
+static void set_tty_raw() {
+    if (!isatty(STDIN_FILENO)) {
+        return;
+    }
+    tcgetattr(STDIN_FILENO, &orig_term);
+    struct termios term;
+    tcgetattr(STDIN_FILENO, &term);
+    cfmakeraw(&term);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term);
+}
+
+static void reset_tty() {
+    if (!isatty(STDIN_FILENO)) {
+        return;
+    }
+    tcsetattr(STDIN_FILENO, TCSANOW, &orig_term);
 }
 
 static int check_floppy(const char* fname) {
@@ -93,6 +114,7 @@ static int modprobe_from_floppy(char* mod) {
 #define FLOPPY_MODE_DIRECT 0
 #define FLOPPY_MODE_OVERLAY 1
 #define FLOPPY_MODE_COPY 2
+#define FLOPPY_MODE_UNKNOWN 100
 
 static int mount_floppy(const char* fn, const int mode) {
     if(mount(fn, "/floppy", "squashfs", MS_RDONLY, NULL)) {
@@ -191,6 +213,57 @@ static int mount_floppy(const char* fn, const int mode) {
     return 1;
 }
 
+#define ROOT_FLOPPY_MODE_ARG "rootfloppymode="
+
+static int floppy_mode_from_char(const char c) {
+    if (c == 'D' || c == 'd') {
+        return FLOPPY_MODE_DIRECT;
+    } else if (c == 'O' || c == 'o') {
+        return FLOPPY_MODE_OVERLAY;
+    } else if (c == 'C' || c == 'c') {
+        return FLOPPY_MODE_COPY;
+    }
+    return FLOPPY_MODE_UNKNOWN;
+}
+
+static void floppy_mode_timeout() {
+    exit(FLOPPY_MODE_UNKNOWN);
+}
+
+static int getc_floppy_mode_1s(const int mode, const int timeout_seconds_remain) {
+    pid_t pid = fork();
+    if (pid < 0) {
+        return -1;
+    }
+    if (pid > 0) {
+        int status;
+        waitpid(pid, &status, 0);
+        return WEXITSTATUS(status);
+    }
+
+    char dmode = 'd';
+    char omode = 'o';
+    char cmode = 'c';
+
+    if (mode == FLOPPY_MODE_DIRECT) {
+        dmode = 'D';
+    } else if (mode == FLOPPY_MODE_OVERLAY) {
+        omode = 'O';
+    } else if (mode == FLOPPY_MODE_COPY) {
+        cmode = 'C';
+    }
+
+    printf("\r\nTo manually override the floppy mode, within %d seconds, please\r\nchoose (D)irect, (O)verlay or (O)opy [%c%c%c]: ", timeout_seconds_remain, dmode, omode, cmode);
+    fflush(stdout);
+
+    signal(SIGALRM, floppy_mode_timeout);
+    alarm(1);
+    int newmode = floppy_mode_from_char(getchar());
+    alarm(0);
+    exit(newmode);
+    return newmode;
+}
+
 int main(int argc, char *argv[]) {
     if(mount("none", "/dev", "devtmpfs", 0, NULL)) {
         perror("mount_devtmpfs");
@@ -200,48 +273,20 @@ int main(int argc, char *argv[]) {
     int mode = FLOPPY_MODE_OVERLAY;
 
     for (int i=0; i<argc; ++i) {
-        if (strcmp(argv[i], "rootfloppymode=direct") == 0) {
-            mode = FLOPPY_MODE_DIRECT;
-        } else if (strcmp(argv[i], "rootfloppymode=overlay") == 0) {
-            mode = FLOPPY_MODE_OVERLAY;
-        } else if (strcmp(argv[i], "rootfloppymode=copy") == 0) {
-            mode = FLOPPY_MODE_COPY;
+        if (strncmp(argv[i], ROOT_FLOPPY_MODE_ARG, strlen(ROOT_FLOPPY_MODE_ARG)) == 0) {
+            mode = floppy_mode_from_char(argv[i][strlen(ROOT_FLOPPY_MODE_ARG)]);
         }
     }
 
-    for (int timeout_seconds_remain = 5; timeout_seconds_remain > 0; timeout_seconds_remain--) {
-        char dmode = 'd';
-        char omode = 'o';
-        char cmode = 'c';
-
-        if (mode == FLOPPY_MODE_DIRECT) {
-            dmode = 'D';
-        } else if (mode == FLOPPY_MODE_OVERLAY) {
-            omode = 'O';
-        } else if (mode == FLOPPY_MODE_COPY) {
-            cmode = 'C';
-        }
-
-        printf("\nTo manually override the floppy mode, within %d seconds, please\nchoose (D)irect, (O)verlay or (O)opy and hit enter [%c%c%c]: ", timeout_seconds_remain, dmode, omode, cmode);
-
-        struct timeval timeout = {1, 0};
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(STDIN_FILENO, &fds);
-        int ret = select(1, &fds, NULL, NULL, &timeout);
-
-        if (ret > 0) {
-            char c = getc(stdin);
-            if (c == 'D' || c == 'd') {
-                mode = FLOPPY_MODE_DIRECT;
-            } else if (c == 'O' || c == 'o') {
-                mode = FLOPPY_MODE_OVERLAY;
-            } else if (c == 'C' || c == 'c') {
-                mode = FLOPPY_MODE_COPY;
-            }
+    set_tty_raw();
+    for (int timeout_seconds_remain = 15; timeout_seconds_remain > 0; timeout_seconds_remain--) {
+        const int newmode = getc_floppy_mode_1s(mode, timeout_seconds_remain);
+        if (newmode != FLOPPY_MODE_UNKNOWN) {
+            mode = newmode;
             break;
         }
     }
+    reset_tty();
 
     printf("\nFloppy mode: ");
     switch (mode) {
@@ -273,9 +318,11 @@ int main(int argc, char *argv[]) {
         }
 
         printf("No floppy disk detected, hit ENTER to retry...\n");
-        if (getc(stdin) <= 0) {
+        set_tty_raw();
+        if (getchar() <= 0) {
             sleep(1);
         }
+        reset_tty();
     }
 
     return 1;
