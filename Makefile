@@ -1,7 +1,7 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 INITRAMFS_BASE=$(ROOT_DIR)/out/initramfs
 
-BOOTLOADER_ORIG=https://github.com/Doridian/tiny-floppy-bootloader/archive/b99dc0effa95e10005a66a36d375215b3dd21e07.tar.gz
+BOOTLOADER_ORIG=https://github.com/Doridian/tiny-floppy-bootloader/archive/9e977c75931f10c821d1ecaa493c48d374ede00d.tar.gz
 
 LINUX_VERSION=6.7.5
 LINUX_DIR=linux-$(LINUX_VERSION)
@@ -96,8 +96,8 @@ build-initramfs:
 	mknod -m 622 out/initramfs/dev/tty0 c 4 0
 
 	-rm -f out/initramfs/init
-	gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/init.c -o out/initramfs/init
-	strip --strip-all out/initramfs/init
+	i486-linux-musl-gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/init.c -o out/initramfs/init
+	i486-linux-musl-strip --strip-all out/initramfs/init
 	chmod 755 out/initramfs/init
 	chown root:root out/initramfs/init
 

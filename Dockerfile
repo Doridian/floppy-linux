@@ -13,8 +13,8 @@ RUN make extract_all
 RUN make install -j$(nproc)
 
 ENV PATH="/opt/musl-cross/bin:${PATH}"
-RUN apk add --no-cache flex bc perl bison quilt rsync python3 nasm xz dosfstools mtools ncurses-terminfo-base genext2fs squashfs-tools kmod ncdu
-RUN apk del gcc g++
+RUN apk add --no-cache flex bc perl bison quilt rsync python3 nasm xz dosfstools mtools ncurses-terminfo-base genext2fs squashfs-tools kmod ncdu linux-headers
+ENV OBJDUMP=i486-linux-musl-objdump
 
 VOLUME /repo-src
 VOLUME /repo-dist
