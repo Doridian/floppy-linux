@@ -209,24 +209,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("Floppy mode: ");
-    switch (mode) {
-        case FLOPPY_MODE_DIRECT:
-            printf("direct\n");
-            break;
-        case FLOPPY_MODE_OVERLAY:
-            printf("overlay\n");
-            break;
-        case FLOPPY_MODE_COPY:
-            printf("copy\n");
-            break;
-        default:
-            printf("unknown\n");
-            return 1;
-    }
-
     for (int timeout_seconds_remain = 5; timeout_seconds_remain > 0; timeout_seconds_remain--) {
-        printf("To change this, within %d seconds, please press (D)irect, (O)verlay or (C)opy and hit enter\n", timeout_seconds_remain);
+        printf("To manually override the floppy mode, within %d seconds, please press (D)irect, (O)verlay or (C)opy and hit enter\n", timeout_seconds_remain);
 
         struct timeval timeout = {1, 0};
         fd_set fds;
@@ -245,6 +229,22 @@ int main(int argc, char *argv[]) {
             }
             break;
         }
+    }
+
+    printf("Floppy mode: ");
+    switch (mode) {
+        case FLOPPY_MODE_DIRECT:
+            printf("direct\n");
+            break;
+        case FLOPPY_MODE_OVERLAY:
+            printf("overlay\n");
+            break;
+        case FLOPPY_MODE_COPY:
+            printf("copy\n");
+            break;
+        default:
+            printf("unknown\n");
+            return 1;
     }
 
     printf("Scanning for root floppy...\n");
