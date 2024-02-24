@@ -17,6 +17,13 @@
 
 #define SQUASHFS_MAGIC 0x73717368
 
+#define ROOT_FLOPPY_MODE_ARG "rootfloppymode="
+
+#define FLOPPY_MODE_DIRECT 0
+#define FLOPPY_MODE_OVERLAY 1
+#define FLOPPY_MODE_COPY 2
+#define FLOPPY_MODE_UNKNOWN 100
+
 static int switch_root(char *newroot, char *newinit)
 {
 	if (chdir(newroot)) {
@@ -110,11 +117,6 @@ static int exec_from_floppy(const char* prog, char *const* argv) {
 static int modprobe_from_floppy(char* mod) {
     return exec_from_floppy("/sbin/modprobe", (char *const[]){"/sbin/modprobe", mod, NULL});
 }
-
-#define FLOPPY_MODE_DIRECT 0
-#define FLOPPY_MODE_OVERLAY 1
-#define FLOPPY_MODE_COPY 2
-#define FLOPPY_MODE_UNKNOWN 100
 
 static int mount_floppy(const char* fn, const int mode) {
     if(mount(fn, "/floppy", "squashfs", MS_RDONLY, NULL)) {
@@ -212,8 +214,6 @@ static int mount_floppy(const char* fn, const int mode) {
     switch_root("/newroot", "/sbin/init");
     return 1;
 }
-
-#define ROOT_FLOPPY_MODE_ARG "rootfloppymode="
 
 static int floppy_mode_from_char(const char c) {
     if (c == 'D' || c == 'd') {
