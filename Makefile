@@ -99,8 +99,7 @@ build-initramfs:
 	-rm -f out/initramfs/init
 	i486-linux-musl-gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/init.c -o out/initramfs/init
 	i486-linux-musl-strip --strip-all out/initramfs/init
-	chmod 755 out/initramfs/init
-	chown root:root out/initramfs/init
+	chmod 555 out/initramfs/init
 
 	cd out/initramfs && \
 	find . | cpio -o -H newc > $(ROOT_DIR)/out/initramfs.cpio
@@ -122,15 +121,18 @@ build-rootfs: build-busybox
 
 	-rm -rf out/rootfs/root
 	-mkdir -p out/rootfs/root
+	chmod 700 out/rootfs/root
 
 	-rm -rf out/rootfs/overlay
 	-mkdir -p out/rootfs/overlay/floppy out/rootfs/overlay/tmpfs
+	chmod 700 out/rootfs/overlay out/rootfs/overlay/floppy out/rootfs/overlay/tmpfs
 
 	-rm -rf out/rootfs/home
 	-mkdir -p out/rootfs/home
 
 	-rm -rf out/rootfs/tmp
 	-mkdir -p out/rootfs/tmp
+	chmod 1777 out/rootfs/tmp
 
 	-rm -rf out/rootfs/var/run
 	-mkdir -p out/rootfs/var/run
@@ -142,59 +144,47 @@ build-rootfs: build-busybox
 
 	cp etc/rc out/rootfs/etc/init.d/rc
 	chmod 755 out/rootfs/etc/init.d/rc
-	chown root:root out/rootfs/etc/init.d/rc
 
 	cp etc/inittab out/rootfs/etc/inittab
 	chmod 755 out/rootfs/etc/inittab
-	chown root:root out/rootfs/etc/inittab
 
 	cp etc/passwd out/rootfs/etc/passwd
 	chmod 644 out/rootfs/etc/passwd
-	chown root:root out/rootfs/etc/passwd
 
 	cp etc/group out/rootfs/etc/group
 	chmod 644 out/rootfs/etc/group
-	chown root:root out/rootfs/etc/group
 
 	cp etc/hosts out/rootfs/etc/hosts
 	chmod 644 out/rootfs/etc/hosts
-	chown root:root out/rootfs/etc/hosts
 
 	cp etc/hostname out/rootfs/etc/hostname
 	chmod 644 out/rootfs/etc/hostname
-	chown root:root out/rootfs/etc/hostname
 
 	echo '#!/bin/sh' > out/rootfs/usr/bin/run-parts
 	echo 'exit 0' >> out/rootfs/usr/bin/run-parts
 	chmod 755 out/rootfs/usr/bin/run-parts
-	chown root:root out/rootfs/usr/bin/run-parts
  
 	cp etc/passwd out/rootfs/etc/passwd
 	chmod 644 out/rootfs/etc/passwd
-	chown root:root out/rootfs/etc/passwd
 
 	cp etc/shadow out/rootfs/etc/shadow
 	chmod 600 out/rootfs/etc/shadow
-	chown root:root out/rootfs/etc/shadow
 
 	cp etc/network/interfaces out/rootfs/etc/network/interfaces
 	chmod 644 out/rootfs/etc/network/interfaces
-	chown root:root out/rootfs/etc/network/interfaces
  
 	-mkdir -p out/rootfs/usr/share/udhcpc
 	cp etc/udhcpc.script out/rootfs/usr/share/udhcpc/default.script
 	chmod 755 out/rootfs/usr/share/udhcpc/default.script
-	chown root:root out/rootfs/usr/share/udhcpc/default.script
 
 	cp config/net.sh out/rootfs/bin/net.sh
 	chmod 755 out/rootfs/bin/net.sh
-	chown root:root out/rootfs/bin/net.sh
 
 	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
 
 	rm -rf out/rootfs/lib/modules/*/kernel/sound
 
-	mksquashfs out/rootfs floppy_linux2.img -noappend -comp xz -no-xattrs -no-exports
+	mksquashfs out/rootfs floppy_linux2.img -noappend -comp xz -no-xattrs -no-exports -all-root
 	ls -la floppy_linux2.img
 	truncate -s 1440k floppy_linux2.img
 	#genext2fs -L "rootfloppy" -q -m 0 -b 1440 -B 1024 -d out/rootfs floppy_linux2.img
