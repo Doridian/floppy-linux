@@ -1,19 +1,16 @@
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <time.h>
+#include <string.h>
 #include <fcntl.h>
+#include <termios.h>
+
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <stdint.h>
-#include <time.h>
-#include <string.h>
-#include <termios.h>
-
-#ifndef MS_MOVE
-# define MS_MOVE     8192
-#endif
 
 #define SQUASHFS_MAGIC 0x73717368
 
