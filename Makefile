@@ -92,8 +92,9 @@ build-initramfs:
 	-rm -rf out/initramfs/newroot
 	-mkdir -p out/initramfs/newroot
 
-	mknod -m 622 out/initramfs/dev/console c 5 1
-	mknod -m 622 out/initramfs/dev/tty0 c 4 0
+	mknod -m 660 out/initramfs/dev/console c 5 1
+	mknod -m 600 out/initramfs/dev/tty0 c 4 0
+	mknod -m 600 out/initramfs/dev/tty1 c 4 1
 
 	-rm -f out/initramfs/init
 	i486-linux-musl-gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/init.c -o out/initramfs/init
@@ -108,6 +109,10 @@ build-initramfs:
 build-rootfs: build-busybox
 	-rm -rf out/rootfs/dev
 	-mkdir -p out/rootfs/dev
+	mknod -m 660 out/rootfs/dev/console c 5 1
+	mknod -m 600 out/rootfs/dev/tty0 c 4 0
+	mknod -m 600 out/rootfs/dev/tty1 c 4 1
+	mknod -m 600 out/rootfs/dev/tty2 c 4 2
 
 	-rm -rf out/rootfs/sys
 	-mkdir -p out/rootfs/sys

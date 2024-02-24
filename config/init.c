@@ -112,7 +112,7 @@ static int mount_floppy(const char* fn) {
         return 1;
     }
     printf("Removing old /dev entries...\n");
-    if (unlink("/dev/console") || unlink("/dev/tty0")) {
+    if (unlink("/dev/console") || unlink("/dev/tty0") || unlink("/dev/tty1")) {
         perror("rm_old_dev");
         return 1;
     }
