@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
             cmode = 'C';
         }
 
-        printf("To manually override the floppy mode, within %d seconds, please\npress (%c)irect, (%c)verlay or (%c)opy and hit enter\n", timeout_seconds_remain, dmode, omode, cmode);
+        printf("\nTo manually override the floppy mode, within %d seconds, please\nchoose (D)irect, (O)verlay or (O)opy and hit enter [%c%c%c]: ", timeout_seconds_remain, dmode, omode, cmode);
 
         struct timeval timeout = {1, 0};
         fd_set fds;
@@ -243,7 +243,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("Floppy mode: ");
+    printf("\nFloppy mode: ");
     switch (mode) {
         case FLOPPY_MODE_DIRECT:
             printf("direct\n");
