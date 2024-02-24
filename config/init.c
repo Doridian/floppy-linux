@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <stdint.h>
 #include <time.h>
+#include <string.h>
 
 #ifndef MS_MOVE
 # define MS_MOVE     8192
@@ -59,7 +60,7 @@ static int check_floppy(const char* fname) {
     return 0;
 }
 
-static int modprobe_from_floppy(const char* mod) {
+static int exec_from_floppy(const char* prog, char *const* argv) {
     pid_t pid = fork();
     if (pid < 0) {
         return -1;
@@ -75,37 +76,95 @@ static int modprobe_from_floppy(const char* mod) {
         return 1;
     }
 
-    execl("/sbin/modprobe", "/sbin/modprobe", mod, NULL);
+    if (chdir("/")) {
+        exit(1);
+        return 1;
+    }
+
+    execv(prog, argv);
     exit(1);
     return 1;
 }
 
-static int mount_floppy(const char* fn) {
+static int modprobe_from_floppy(char* mod) {
+    return exec_from_floppy("/sbin/modprobe", (char *const[]){"/sbin/modprobe", mod, NULL});
+}
+
+#define FLOPPY_MODE_DIRECT 0
+#define FLOPPY_MODE_OVERLAY 1
+#define FLOPPY_MODE_COPY 2
+
+static int mount_floppy(const char* fn, const int mode) {
     if(mount(fn, "/floppy", "squashfs", MS_RDONLY, NULL)) {
         perror("mount_floppy");
         return 1;
     }
     printf("Floppy disk mounted!\n");
-    printf("Loading overlay kmod...\n");
-    if (modprobe_from_floppy("overlay")) {
-        perror("load_overlay_kmod");
-        return 1;
+
+    if (mode == FLOPPY_MODE_OVERLAY) {
+        if(mount("none", "/tmpfs", "tmpfs", 0, NULL)) {
+            perror("mount_tmpfs");
+            return 1;
+        }
+        if(mkdir("/tmpfs/work", 0755)) {
+            perror("mkdir_tmpfs_work");
+            return 1;
+        }
+        if(mkdir("/tmpfs/upper", 0755)) {
+            perror("mkdir_tmpfs_upper");
+            return 1;
+        }
+
+        printf("Loading overlay kmod...\n");
+        if (modprobe_from_floppy("overlay")) {
+            perror("load_overlay_kmod");
+            return 1;
+        }
+        printf("Mounting overlay...\n");
+        if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmpfs/upper,workdir=/tmpfs/work")) {
+            perror("mount_overlay");
+            return 1;
+        }
+        printf("Mounting /overlay/floppy...\n");
+        if(mount("/floppy", "/newroot/overlay/floppy", NULL, MS_MOVE, NULL)) {
+            perror("mount_move_floppy");
+            return 1;
+        }
+        printf("Mounting /overlay/tmpfs...\n");
+        if (mount("/tmpfs", "/newroot/overlay/tmpfs", NULL, MS_MOVE, NULL)) {
+            perror("mount_move_tmpfs");
+            return 1;
+        }
+    } else if (mode == FLOPPY_MODE_DIRECT) { 
+        if (mount("/floppy", "/newroot", NULL, MS_MOVE, NULL)) {
+            perror("mount_move_floppy");
+            return 1;
+        }
+    } else if (mode == FLOPPY_MODE_COPY) {
+        if(mount("none", "/floppy/overlay/tmpfs", "tmpfs", 0, NULL)) {
+            perror("mount_tmpfs_newroot");
+            return 1;
+        }
+
+        if(mount(fn, "/floppy/overlay/floppy", "squashfs", MS_RDONLY, NULL)) {
+            perror("mount_floppy_copy");
+            return 1;
+        }
+
+        exec_from_floppy("/bin/cp", (char *const[]){"/bin/cp", "-a", "/overlay/floppy/.", "/overlay/tmpfs/", NULL});
+
+        printf("Moving mount /floppy/overlay/tmpfs to /newroot...\n");
+        if(mount("/floppy/overlay/tmpfs", "/newroot", NULL, MS_MOVE, NULL)) {
+            perror("mount_move_floppy");
+            return 1;
+        }
+        printf("Unmounting /floppy, /floppy/overlay/floppy...\n");
+        if (umount("/floppy/overlay/floppy") || umount("/floppy")) {
+            perror("umount_floppy_copy");
+            return 1;
+        }
     }
-    printf("Mounting overlay...\n");
-    if(mount("overlay", "/newroot", "overlay", 0, "lowerdir=/floppy,upperdir=/tmpfs/upper,workdir=/tmpfs/work")) {
-        perror("mount_overlay");
-        return 1;
-    }
-    printf("Mounting /overlay/floppy...\n");
-    if(mount("/floppy", "/newroot/overlay/floppy", NULL, MS_MOVE, NULL)) {
-        perror("mount_move_floppy");
-        return 1;
-    }
-    printf("Mounting /overlay/tmpfs...\n");
-    if (mount("/tmpfs", "/newroot/overlay/tmpfs", NULL, MS_MOVE, NULL)) {
-        perror("mount_move_tmpfs");
-        return 1;
-    }
+
     printf("Unmounting old /dev...\n");
     if (umount("/dev")) {
         perror("umount_dev");
@@ -126,28 +185,66 @@ static int mount_floppy(const char* fn) {
         perror("rm_self");
         return 1;
     }
+
     printf("Switching root...\n");
     switch_root("/newroot", "/sbin/init");
     return 1;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     if(mount("none", "/dev", "devtmpfs", 0, NULL)) {
         perror("mount_devtmpfs");
         return 1;
     }
 
-    if(mount("none", "/tmpfs", "tmpfs", 0, NULL)) {
-        perror("mount_tmpfs");
-        return 1;
+    int mode = FLOPPY_MODE_OVERLAY;
+
+    for (int i=0; i<argc; ++i) {
+        if (strcmp(argv[i], "rootfloppymode=direct") == 0) {
+            mode = FLOPPY_MODE_DIRECT;
+        } else if (strcmp(argv[i], "rootfloppymode=overlay") == 0) {
+            mode = FLOPPY_MODE_OVERLAY;
+        } else if (strcmp(argv[i], "rootfloppymode=copy") == 0) {
+            mode = FLOPPY_MODE_COPY;
+        }
     }
-    if(mkdir("/tmpfs/work", 0755)) {
-        perror("mkdir_tmpfs_work");
-        return 1;
+
+    printf("Floppy mode: ");
+    switch (mode) {
+        case FLOPPY_MODE_DIRECT:
+            printf("direct\n");
+            break;
+        case FLOPPY_MODE_OVERLAY:
+            printf("overlay\n");
+            break;
+        case FLOPPY_MODE_COPY:
+            printf("copy\n");
+            break;
+        default:
+            printf("unknown\n");
+            return 1;
     }
-    if(mkdir("/tmpfs/upper", 0755)) {
-        perror("mkdir_tmpfs_upper");
-        return 1;
+
+    for (int timeout_seconds_remain = 5; timeout_seconds_remain > 0; timeout_seconds_remain--) {
+        printf("To change this, within %d seconds, please press (D)irect, (O)verlay or (C)opy and hit enter\n", timeout_seconds_remain);
+
+        struct timeval timeout = {1, 0};
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(STDIN_FILENO, &fds);
+        int ret = select(1, &fds, NULL, NULL, &timeout);
+
+        if (ret > 0) {
+            char c = getc(stdin);
+            if (c == 'D' || c == 'd') {
+                mode = FLOPPY_MODE_DIRECT;
+            } else if (c == 'O' || c == 'o') {
+                mode = FLOPPY_MODE_OVERLAY;
+            } else if (c == 'C' || c == 'c') {
+                mode = FLOPPY_MODE_COPY;
+            }
+            break;
+        }
     }
 
     printf("Scanning for root floppy...\n");
@@ -159,7 +256,7 @@ int main() {
             printf("Querying device: %s\n", fn);
             if (check_floppy(fn)) {
                 printf("Floppy disk detected: %s\n", fn);
-                return mount_floppy(fn);
+                return mount_floppy(fn, mode);
             }
         }
 
