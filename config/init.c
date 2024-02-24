@@ -210,7 +210,19 @@ int main(int argc, char *argv[]) {
     }
 
     for (int timeout_seconds_remain = 5; timeout_seconds_remain > 0; timeout_seconds_remain--) {
-        printf("To manually override the floppy mode, within %d seconds, please press (D)irect, (O)verlay or (C)opy and hit enter\n", timeout_seconds_remain);
+        char dmode = 'd';
+        char omode = 'o';
+        char cmode = 'c';
+
+        if (mode == FLOPPY_MODE_DIRECT) {
+            dmode = 'D';
+        } else if (mode == FLOPPY_MODE_OVERLAY) {
+            omode = 'O';
+        } else if (mode == FLOPPY_MODE_COPY) {
+            cmode = 'C';
+        }
+
+        printf("To manually override the floppy mode, within %d seconds, please\npress (%c)irect, (%c)verlay or (%c)opy and hit enter\n", timeout_seconds_remain, dmode, omode, cmode);
 
         struct timeval timeout = {1, 0};
         fd_set fds;
