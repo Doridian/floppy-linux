@@ -97,7 +97,7 @@ build-initramfs:
 	mknod -m 600 out/initramfs/dev/tty1 c 4 1
 
 	-rm -f out/initramfs/init
-	i486-linux-musl-gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static config/init.c -o out/initramfs/init
+	i486-linux-musl-gcc -Wall -Werror -flto -Os -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -DNDEBUG -static bin/init.c -o out/initramfs/init
 	i486-linux-musl-strip --strip-all out/initramfs/init
 	chmod 555 out/initramfs/init
 
@@ -177,8 +177,8 @@ build-rootfs: build-busybox
 	cp etc/udhcpc.script out/rootfs/usr/share/udhcpc/default.script
 	chmod 755 out/rootfs/usr/share/udhcpc/default.script
 
-	cp config/net.sh out/rootfs/bin/net.sh
-	chmod 755 out/rootfs/bin/net.sh
+	cp bin/*.sh out/rootfs/bin
+	chmod 755 out/rootfs/bin/*.sh
 
 	dd if=/dev/zero of=./floppy_linux2.img bs=1k count=1440
 
