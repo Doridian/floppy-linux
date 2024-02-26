@@ -14,4 +14,4 @@ mkdir -p dist out src stamp
 
 make download-all
 
-exec /bin/bash
+exec /bin/bash "$@"
